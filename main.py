@@ -1,4 +1,4 @@
-import random
+import time
 
 
 # def find_max(arr):
@@ -30,27 +30,36 @@ def find_min(arr):
     return min_index
 
 
-def generate_data():
-    task_count = 15
-    tasks = [random.randint(1, 10) for _ in range(task_count)]
-    processor_count = 3
-    return task_count, tasks, processor_count
-
-
-def main():
-    task_count, tasks, processor_count = generate_data()
-    # task_count, tasks, processor_count = load_data()
-
+def greedy_algorithm(tasks, processor_count):
     processors = [0] * processor_count
     print(tasks)
     for task in tasks:
         p_index = find_min(processors)
         processors[p_index] += task
+    return processors
 
-    i = 1
+
+def main():
+    task_count, tasks, processor_count = load_data()
+
+    start_time = time.time()
+    processors = greedy_algorithm(tasks, processor_count)
+    elapsed_time = time.time() - start_time
+
+    i = 0
+    max_time = 0
     for processor in processors:
-        print('P' + str(i) + ': ' + str(processor))
+        if i == 0:
+            max_time = i
+        else:
+            if processor > processors[max_time]:
+                max_time = i
+        print('P' + str(i+1) + ': ' + str(processor))
         i += 1
+
+    # print(f"Execution time for greedy_algorithm: {elapsed_time:.6f} seconds")
+
+    print('Wynik: ' + str(processors[max_time]))
 
 
 if __name__ == "__main__":
