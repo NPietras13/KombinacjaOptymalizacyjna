@@ -16,14 +16,13 @@ def mutate(individual):
     return individual
 
 
-def crossover(parent1, parent2):
+def crossover(parent2, parent1):
     """
     Operacja krzyżowania (OX).
     """
     size = len(parent1)
     start, end = sorted(random.sample(range(size), 2))
     child = [None] * size
-
     child[start:end + 1] = parent1[start:end + 1]
 
     current_pos = (end + 1) % size
@@ -59,23 +58,34 @@ def greedy_algorithm(individual, tasks, processor_count):
     return max(processors)
 
 
-def genetic_algorithm_multi_processor(n_tasks, task_durations, num_generations=100, population_size=30, n_processors=3):
+def genetic_algorithm_multi_processor(n_tasks, task_durations, num_generations=20, population_size=20, n_processors=3):
     generations = []
+    new_population = []
+    t_maxes = []
     for generation in range(num_generations):
-        population = [create_starting_individual(n_tasks) for _ in range(2)]
+        if(len(new_population) <= 0):
+            population = [create_starting_individual(n_tasks) for _ in range(2)]
+        else:
+            population = [create_starting_individual(n_tasks) for _ in range(1)]
+            population.append(new_population[find_min(t_maxes)])
         new_population = population
         while len(new_population) < population_size:
             t_maxes = []
             for individual in population:
                 t_maxes.append(greedy_algorithm(individual, task_durations, n_processors))
             temp = t_maxes.copy()
-            parent1 = population[find_min(temp)]
-            temp.pop(find_min(temp))
-            parent2 = population[find_min(temp)]
+            print(t_maxes)
+            if random.random() < 0.2:
+                parent1 = population[find_min(temp)]
+                parent2 = population[random.randint(0, len(population) - 1)]
+            else:
+                parent1 = population[find_min(temp)]
+                print(min(temp))
+                temp.pop(find_min(temp))
+                parent2 = population[find_min(temp)]
 
             child = crossover(parent1, parent2)
-
-            if random.random() < 0.1:
+            if random.random() < 0.2:
                 child = mutate(child)
 
             new_population.append(child)
@@ -100,8 +110,8 @@ def load_data(filename="data.txt"):
 
 
 task_count, task_durations, n_processors = load_data()
-generations = genetic_algorithm_multi_processor(task_count, task_durations, num_generations=30,
-                                                                       population_size=300, n_processors=n_processors)
+generations = genetic_algorithm_multi_processor(task_count, task_durations, num_generations=100,
+                                                                       population_size=2000, n_processors=n_processors)
 
 t_maxes = []
 for population in generations:
