@@ -1,56 +1,38 @@
+import time
 import numpy as np
 import random
-import itertools
 
 
-# Funkcja celu: obliczenie "makespan" oraz harmonogram dla wielu procesorów
-def multi_processor_schedule_and_makespan(schedule, task_durations, n_processors):
-    """
-    Oblicz harmonogram zadań na wielu procesorach oraz ich "makespan".
-    """
-    # Używamy listy, aby śledzić zadania przypisane do każdego procesora
-    processor_schedules = [[] for _ in range(n_processors)]
-    processor_loads = [0] * n_processors
-
-    # Przypisanie zadań do procesorów
-    for task in schedule:
-        min_load_processor = processor_loads.index(min(processor_loads))
-        processor_schedules[min_load_processor].append(task)
-        processor_loads[min_load_processor] += task_durations[task]
-
-    # Obliczenie "makespan"
-    makespan = max(processor_loads)
-
-    return processor_schedules, makespan
+# Funkcje pomocnicze (niezmienione)
+def create_starting_individual(n_tasks):
+    return np.arange(0, n_tasks)
 
 
-def create_multi_processor_individual(n_tasks):
-    """
-    Stwórz losowy harmonogram dla wielu procesorów.
-    """
+def create_random_individual(n_tasks):
     return np.random.permutation(n_tasks)
 
 
 def mutate(individual):
-    """
-    Mutacja polegająca na zamianie miejscami dwóch losowych zadań.
-    """
     idx1, idx2 = random.sample(range(len(individual)), 2)
     individual[idx1], individual[idx2] = individual[idx2], individual[idx1]
     return individual
 
 
 def crossover(parent1, parent2):
-    """
-    Operacja krzyżowania Order Crossover (OX).
-    """
     size = len(parent1)
+
+    # Wybieramy dwa punkty krzyżowania losowo
     start, end = sorted(random.sample(range(size), 2))
+
+    # Inicjujemy dziecko z None
     child = [None] * size
 
+    # Kopiujemy segment z pierwszego rodzica
     child[start:end + 1] = parent1[start:end + 1]
+    print(child)
 
-    current_pos = (end + 1) % size
+    # Wypełniamy pozostałe miejsca genami z drugiego rodzica w oryginalnej kolejności
+    current_pos = 0
     for task in parent2:
         if task not in child:
             while child[current_pos] is not None:
@@ -60,56 +42,83 @@ def crossover(parent1, parent2):
     return np.array(child)
 
 
-def selection(population, fitnesses):
-    """
-    Selekcja ruletkowa.
-    """
-    total_fitness = sum(fitnesses)
-    pick = random.uniform(0, total_fitness)
-    current = 0
-    for idx, fitness in enumerate(fitnesses):
-        current += fitness
-        if current > pick:
-            return population[idx]
-    return population[-1]
+def find_min(arr):
+    if not arr:
+        return -1
+    min_value = min(arr)
+    min_index = arr.index(min_value)
+    return min_index
 
 
-# Główna funkcja algorytmu genetycznego
-def genetic_algorithm_multi_processor(task_durations, num_generations=100, population_size=30, n_processors=3):
-    n_tasks = len(task_durations)
+def find_max(arr):
+    if not arr:
+        return -1
+    max_value = max(arr)
+    max_index = arr.index(max_value)
+    return max_index
 
-    population = [create_multi_processor_individual(n_tasks) for _ in range(population_size)]
 
-    for generation in range(num_generations):
-        # Obliczanie fitness dla całej populacji
-        fitnesses = [1 / multi_processor_schedule_and_makespan(individual, task_durations, n_processors)[1]
-                     for individual in population]
+def greedy_algorithm(individual, tasks, processor_count):
+    processors = [0] * processor_count
+    for task in individual:
+        p_index = find_min(processors)
+        processors[p_index] += tasks[task]
+    return max(processors)
 
-        new_population = []
 
+def tournament_selection(population, task_durations, n_processors, k=3):
+    selected = []
+    for _ in range(len(population)):
+        tournament = random.sample(population, k)
+        print('xd: ',str(tournament))
+        tournament_fitness = [greedy_algorithm(individual, task_durations, n_processors) for individual in tournament]
+        winner_index = find_min(tournament_fitness)
+        selected.append(tournament[winner_index])
+    return selected
+
+
+def elitism_selection(population, task_durations, n_processors, elite_size=2):
+    fitness_values = [greedy_algorithm(individual, task_durations, n_processors) for individual in population]
+    sorted_indices = np.argsort(fitness_values)
+    selected = [population[idx] for idx in sorted_indices[:elite_size]]
+    print(selected)
+    return selected
+
+
+def genetic_algorithm_multi_processor(n_tasks, task_durations, max_time=180, population_size=100, n_processors=50,
+                                      mutation_probability=0.1, crossover_probability=0.9, tournament_size=3,
+                                      elite_size=2):
+    generations = []
+    population = [create_random_individual(n_tasks) for _ in range(population_size)]
+    start_time = time.time()
+
+    while time.time() - start_time < max_time:
+        t_maxes = [greedy_algorithm(individual, task_durations, n_processors) for individual in population]
+        new_population = elitism_selection(population, task_durations, n_processors, elite_size=elite_size)
+
+        selected_population = tournament_selection(population, task_durations, n_processors, k=tournament_size)
+        print(t_maxes)
+        print(population)
         while len(new_population) < population_size:
-            parent1 = selection(population, fitnesses)
-            parent2 = selection(population, fitnesses)
+            if random.random() < crossover_probability:
+                print(selected_population)
+                print('\n')
+                parent1, parent2 = random.sample(selected_population, 2)
+                print(parent1, parent2)
+                child = crossover(parent1, parent2)
+                print(child)
+            else:
+                child = random.choice(selected_population)
 
-            child = crossover(parent1, parent2)
-
-            if random.random() < 0.1:
+            if random.random() < mutation_probability:
                 child = mutate(child)
 
             new_population.append(child)
 
+        generations.append(population)
         population = new_population
 
-    # Znalezienie najlepszego harmonogramu
-    final_fitnesses = [1 / multi_processor_schedule_and_makespan(individual, task_durations, n_processors)[1]
-                       for individual in population]
-    best_index = np.argmax(final_fitnesses)
-
-    best_schedule = population[best_index]
-    processor_schedules, best_makespan = multi_processor_schedule_and_makespan(best_schedule, task_durations,
-                                                                               n_processors)
-
-    return processor_schedules, best_makespan
+    return generations
 
 
 def load_data(filename="data.txt"):
@@ -124,14 +133,27 @@ def load_data(filename="data.txt"):
                 break
     return task_count, tasks, processor_count
 
-# Przykład użycia:
+
+# Ładowanie danych
 task_count, task_durations, n_processors = load_data()
 
-processor_schedules, best_makespan = genetic_algorithm_multi_processor(task_durations, num_generations=100,
-                                                                       population_size=30, n_processors=n_processors)
+# Pomiar czasu
+start_time = time.time()
 
-print("Najlepszy harmonogram dla każdego procesora:")
-for i, schedule in enumerate(processor_schedules):
-    print(f"Procesor {i + 1}: {schedule}")
+# Uruchomienie algorytmu genetycznego
+generations = genetic_algorithm_multi_processor(task_count, task_durations, max_time=1, population_size=4,
+                                                n_processors=n_processors, mutation_probability=0.10,
+                                                crossover_probability=1, tournament_size=2, elite_size=2)
 
-print("Całkowity czas ukończenia (makespan):", best_makespan)
+# Pomiar czasu zakończenia
+end_time = time.time()
+elapsed_time = end_time - start_time
+
+# Ocena wyników
+t_maxes = []
+for population in generations:
+    for individual in population:
+        t_maxes.append(greedy_algorithm(individual, task_durations, n_processors))
+
+print("Najlepszy czas: ", min(t_maxes))
+print("Czas wykonania: ", elapsed_time, "sekund")

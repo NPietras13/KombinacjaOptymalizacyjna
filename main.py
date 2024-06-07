@@ -36,6 +36,7 @@ def greedy_algorithm(tasks, processor_count):
     for task in tasks:
         p_index = find_min(processors)
         processors[p_index] += task
+        print(str(p_index) + ': ' + str(task))
     return processors
 
 
@@ -54,7 +55,7 @@ def main():
         else:
             if processor > processors[max_time]:
                 max_time = i
-        print('P' + str(i+1) + ': ' + str(processor))
+        print('P' + str(i+1) + ': ' + str(processor) )
         i += 1
 
     # print(f"Execution time for greedy_algorithm: {elapsed_time:.6f} seconds")
